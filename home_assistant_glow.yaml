@@ -8,8 +8,10 @@ substitutions:
   device_name: home_assistant_glow
   friendly_name: House
   device_description: "Measure your energy consumption with the pulse LED on your smart meter"
-  pulse_pin: GPIO12
-  status_led: GPIO5
+  pulse_pin: GPIO27
+  led_status: GPIO2
+  led_pulse: GPIO25
+  
   # imp/kWh rate ⬇ #
   pulse_rate: '1000'
 
@@ -56,11 +58,8 @@ output:
   #   pin: GPIO5
   #   id: output_blue
   - platform: gpio
-    pin: GPIO2
+    pin: ${led_pulse}
     id: output_red
-  - platform: gpio
-    pin: GPIO4
-    id: output_green
 
 light:
   - platform: binary
@@ -73,7 +72,7 @@ light:
 status_led:
   pin:
     # Blue LED
-    number: ${status_led}
+    number: ${led_status}
 
 # Sensors for ESP version and WIFI information
 text_sensor:
@@ -96,6 +95,7 @@ sensor:
     device_class: power
     icon: mdi:flash-outline
     accuracy_decimals: 0
+    internal_filter: 10ms # Pulse must be at least 10ms long for it to trigger
     pin: ${pulse_pin}
     on_value:
       then:
@@ -105,6 +105,7 @@ sensor:
     filters:
       # multiply value = (60 / imp value) * 1000
       # - multiply: 60
+      #- throttle: 50ms
       - lambda: return x * ((60.0 / ${pulse_rate}) * 1000.0);
     total:
       name: '${friendly_name} - Total energy'
