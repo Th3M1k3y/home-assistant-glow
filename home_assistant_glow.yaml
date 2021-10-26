@@ -5,12 +5,13 @@
 # meter, useful if you do not have a serial port (P1).
 #
 substitutions:
-  device_name: home_assistant_glow
+  device_name: home-assistant-glow
   friendly_name: House
   device_description: "Measure your energy consumption with the pulse LED on your smart meter"
-  pulse_pin: GPIO27
+  pulse_pin: GPIO16
   led_status: GPIO2
   led_pulse: GPIO25
+  update_interval: 5s
   
   # imp/kWh rate ⬇ #
   pulse_rate: '1000'
@@ -25,8 +26,8 @@ esphome:
   board: nodemcu-32s
 
 wifi:
-  ssid: !secret wifi_ssid
-  password: !secret wifi_password
+  ssid: !secret iot_ssid
+  password: !secret iot_pass
 
   # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
@@ -37,6 +38,7 @@ captive_portal:
 
 # Enable logging
 logger:
+  level: WARN
 
 # Enable Home Assistant API
 api:
@@ -54,25 +56,21 @@ web_server:
     password: !secret esphome_web_password
 
 output:
-  # - platform: gpio
-  #   pin: GPIO5
-  #   id: output_blue
   - platform: gpio
     pin: ${led_pulse}
-    id: output_red
+    id: output_led_pulse
 
 light:
   - platform: binary
     internal: true
-    id: led_red
-    name: Red
-    output: output_red
+    id: led_pulse
+    name: Pulse LED
+    output: output_led_pulse
 
-# Status LED for connection
 status_led:
   pin:
-    # Blue LED
     number: ${led_status}
+    inverted: false
 
 # Sensors for ESP version and WIFI information
 text_sensor:
@@ -95,27 +93,23 @@ sensor:
     device_class: power
     icon: mdi:flash-outline
     accuracy_decimals: 0
-    internal_filter: 10ms # Pulse must be at least 10ms long for it to trigger
+    internal_filter: 25ms # Pulse must be at least 25ms long for it to trigger
     pin: ${pulse_pin}
     on_value:
       then:
         - light.turn_on:
-            id: led_red
-            flash_length: 400ms
+            id: led_pulse
+            flash_length: 20ms
     filters:
-      # multiply value = (60 / imp value) * 1000
-      # - multiply: 60
-      #- throttle: 50ms
+      - throttle_average: ${update_interval}
       - lambda: return x * ((60.0 / ${pulse_rate}) * 1000.0);
     total:
       name: '${friendly_name} - Total energy'
       unit_of_measurement: 'kWh'
       icon: mdi:circle-slice-3
-      last_reset_type: auto
-      state_class: measurement
+      state_class: total_increasing
       device_class: energy
       accuracy_decimals: 3
       filters:
-        # multiply value = 1 / imp value
-        # - multiply: 0.001
+        - throttle: ${update_interval}
         - lambda: return x * (1.0 / ${pulse_rate});
